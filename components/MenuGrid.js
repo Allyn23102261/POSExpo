@@ -1,12 +1,11 @@
 import React from 'react';
 import { FlatList, StyleSheet } from 'react-native';
 import MenuItem from './MenuItem';
-import { MENU_ITEMS } from '../constants';
 
-export default function MenuGrid({ onSelectItem }) {
+export default function MenuGrid({ menuItems, onSelectItem }) {
   return (
     <FlatList
-      data={MENU_ITEMS}
+      data={menuItems}
       keyExtractor={(item) => String(item.id)}
       numColumns={2}
       renderItem={({ item }) => (
@@ -20,7 +19,5 @@ export default function MenuGrid({ onSelectItem }) {
 }
 
 const styles = StyleSheet.create({
-  grid: {
-    paddingBottom: 8,
-  },
+  grid: { paddingBottom: 8 },
 });

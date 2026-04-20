@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, ScrollView, StyleSheet, Alert, SafeAreaView, StatusBar, TouchableOpacity, Text } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Header from '../components/Header';
@@ -10,6 +10,7 @@ import PaymentModal from '../components/PaymentModal';
 import OrderHistoryItem from '../components/OrderHistoryItem';
 import { COLORS } from '../constants';
 import { generateOrderId, getTimestamp, calcSubtotal } from '../utils/helpers';
+import { fetchMenu, saveOrder, fetchOrders } from '../utils/api';
 
 export default function POSScreen() {
   const [cart, setCart] = useState([]);
@@ -22,6 +23,30 @@ export default function POSScreen() {
   const [receiptTimestamp, setReceiptTimestamp] = useState('');
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [amountReceived, setAmountReceived] = useState(0);
+  const [menuItems, setMenuItems] = useState([]);
+
+  useEffect(() => {
+    loadMenu();
+    loadOrders();
+  }, []);
+
+  const loadMenu = async () => {
+    try {
+      const data = await fetchMenu();
+      setMenuItems(data);
+    } catch (err) {
+      Alert.alert('Error', 'Failed to load menu. Is the server running?');
+    }
+  };
+
+  const loadOrders = async () => {
+    try {
+      const data = await fetchOrders();
+      setOrderHistory(data);
+    } catch (err) {
+      console.log('Failed to load orders:', err);
+    }
+  };
 
   const handleSelectMenuItem = (item) => {
     setSelectedMenuItem(item);
@@ -67,7 +92,7 @@ export default function POSScreen() {
     setReceiptVisible(true);
   };
 
-  const handleConfirmSale = () => {
+  const handleConfirmSale = async () => {
     const order = {
       id: generateOrderId(),
       items: [...cart],
@@ -77,10 +102,15 @@ export default function POSScreen() {
       change: amountReceived - calcSubtotal(cart),
       timestamp: receiptTimestamp,
     };
-    setOrderHistory((prev) => [order, ...prev].slice(0, 20));
-    setCart([]);
-    setReceiptVisible(false);
-    Alert.alert('✓ Sale Completed', 'Thank you!');
+    try {
+      await saveOrder(order);
+      setOrderHistory((prev) => [order, ...prev].slice(0, 20));
+      setCart([]);
+      setReceiptVisible(false);
+      Alert.alert('✔ Sale Completed', 'Thank you!');
+    } catch (err) {
+      Alert.alert('Error', 'Failed to save order.');
+    }
   };
 
   return (
@@ -89,7 +119,7 @@ export default function POSScreen() {
         <StatusBar barStyle="dark-content" />
         <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           <Header />
-          <MenuGrid onSelectItem={handleSelectMenuItem} />
+          <MenuGrid menuItems={menuItems} onSelectItem={handleSelectMenuItem} />
           <View style={styles.tabsContainer}>
             <View style={styles.tabBar}>
               {['cart', 'history'].map((tab) => (
