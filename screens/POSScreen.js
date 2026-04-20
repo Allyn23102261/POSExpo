@@ -6,6 +6,7 @@ import MenuGrid from '../components/MenuGrid';
 import SizeModal from '../components/SizeModal';
 import CartSummary from '../components/CartSummary';
 import ReceiptModal from '../components/ReceiptModal';
+import PaymentModal from '../components/PaymentModal';
 import OrderHistoryItem from '../components/OrderHistoryItem';
 import { COLORS } from '../constants';
 import { generateOrderId, getTimestamp, calcSubtotal } from '../utils/helpers';
@@ -19,6 +20,8 @@ export default function POSScreen() {
   const [selectedMenuItem, setSelectedMenuItem] = useState(null);
   const [receiptVisible, setReceiptVisible] = useState(false);
   const [receiptTimestamp, setReceiptTimestamp] = useState('');
+  const [paymentModalVisible, setPaymentModalVisible] = useState(false);
+  const [amountReceived, setAmountReceived] = useState(0);
 
   const handleSelectMenuItem = (item) => {
     setSelectedMenuItem(item);
@@ -54,12 +57,26 @@ export default function POSScreen() {
 
   const handleCheckout = () => {
     if (cart.length === 0) { Alert.alert('Empty Cart', 'Please add items before checking out.'); return; }
+    setPaymentModalVisible(true);
+  };
+
+  const handlePaymentConfirm = (received) => {
+    setAmountReceived(received);
+    setPaymentModalVisible(false);
     setReceiptTimestamp(getTimestamp());
     setReceiptVisible(true);
   };
 
   const handleConfirmSale = () => {
-    const order = { id: generateOrderId(), items: [...cart], total: calcSubtotal(cart), payment: selectedPayment, timestamp: receiptTimestamp };
+    const order = {
+      id: generateOrderId(),
+      items: [...cart],
+      total: calcSubtotal(cart),
+      payment: selectedPayment,
+      amountReceived: amountReceived,
+      change: amountReceived - calcSubtotal(cart),
+      timestamp: receiptTimestamp,
+    };
     setOrderHistory((prev) => [order, ...prev].slice(0, 20));
     setCart([]);
     setReceiptVisible(false);
@@ -98,8 +115,26 @@ export default function POSScreen() {
             )}
           </View>
         </ScrollView>
+
         <SizeModal visible={sizeModalVisible} item={selectedMenuItem} onSelect={handleSelectSize} onClose={() => setSizeModalVisible(false)} />
-        <ReceiptModal visible={receiptVisible} cart={cart} payment={selectedPayment} timestamp={receiptTimestamp} onConfirm={handleConfirmSale} onClose={() => setReceiptVisible(false)} />
+
+        <PaymentModal
+          visible={paymentModalVisible}
+          total={calcSubtotal(cart)}
+          payment={selectedPayment}
+          onConfirm={handlePaymentConfirm}
+          onClose={() => setPaymentModalVisible(false)}
+        />
+
+        <ReceiptModal
+          visible={receiptVisible}
+          cart={cart}
+          payment={selectedPayment}
+          timestamp={receiptTimestamp}
+          amountReceived={amountReceived}
+          onConfirm={handleConfirmSale}
+          onClose={() => setReceiptVisible(false)}
+        />
       </SafeAreaView>
     </LinearGradient>
   );
