@@ -3,6 +3,12 @@ import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
 import { COLORS } from '../constants';
 import { formatCurrency } from '../utils/helpers';
 
+const IMAGE_MAP = {
+  'lemongrass.png': require('../assets/lemongrass.png'),
+  'peach.jpg': require('../assets/peach.jpg'),
+  'frosty.jpg': require('../assets/frosty.jpg'),
+};
+
 export default function MenuItem({ item, onPress }) {
   const minPrice = Math.min(...item.sizes.map((s) => s.price));
   const maxPrice = Math.max(...item.sizes.map((s) => s.price));
@@ -13,7 +19,7 @@ export default function MenuItem({ item, onPress }) {
       onPress={() => onPress(item)}
       activeOpacity={0.8}
     >
-      <Image source={item.image} style={styles.image} resizeMode="cover" />
+      <Image source={IMAGE_MAP[item.image_name]} style={styles.image} resizeMode="cover" />
       <View style={styles.info}>
         <Text style={styles.name} numberOfLines={2}>{item.name}</Text>
         <Text style={styles.price}>
