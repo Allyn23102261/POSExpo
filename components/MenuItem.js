@@ -19,7 +19,7 @@ export default function MenuItem({ item, onPress }) {
       onPress={() => onPress(item)}
       activeOpacity={0.8}
     >
-      <Image source={IMAGE_MAP[item.image_name]} style={styles.image} resizeMode="cover" />
+      <Image source={IMAGE_MAP[item.image_name]} style={styles.image} resizeMode="contain" />
       <View style={styles.info}>
         <Text style={styles.name} numberOfLines={2}>{item.name}</Text>
         <Text style={styles.price}>
@@ -32,7 +32,7 @@ export default function MenuItem({ item, onPress }) {
 
 const styles = StyleSheet.create({
   card: {
-    flex: 1,
+    flex: 0,
     backgroundColor: COLORS.white,
     borderRadius: 14,
     overflow: 'hidden',
@@ -41,7 +41,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 6,
     elevation: 4,
-    margin: 6,
+    marginRight: 6,
+    marginBottom: 6,
   },
   image: {
     width: '100%',
