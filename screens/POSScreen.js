@@ -170,13 +170,17 @@ export default function POSScreen({ user, onLogout }) {
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              style={styles.tabBarScroll}
-              contentContainerStyle={styles.tabBar}
+              style={[styles.tabBarScroll, styles.tabBar]}
+              contentContainerStyle={styles.tabBarContent}
             >
-              {tabs.map((tab) => (
+              {tabs.map((tab, index) => (
                 <TouchableOpacity
                   key={tab}
-                  style={[styles.tab, activeTab === tab && styles.tabActive]}
+                  style={[
+                    styles.tab,
+                    index < tabs.length - 1 && styles.tabSpacing,
+                    activeTab === tab && styles.tabActive,
+                  ]}
                   onPress={() => setActiveTab(tab)}
                 >
                   <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
@@ -261,21 +265,22 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   scrollContent: { padding: 16, paddingBottom: 40 },
   tabsContainer: { marginTop: 16 },
-  tabBarScroll: { marginBottom: 12 },
-  tabBar: {
-    flexDirection: 'row',
+  tabBarScroll: {
+    marginBottom: 12,
     backgroundColor: COLORS.white,
     borderRadius: 12,
     padding: 4,
-    gap: 4,
     elevation: 3,
+    overflow: 'hidden',
   },
+  tabBarContent: { flexDirection: 'row' },
   tab: {
     paddingVertical: 10,
     paddingHorizontal: 14,
-    borderRadius: 9,
+    borderRadius: 10,
     alignItems: 'center',
   },
+  tabSpacing: { marginRight: 4 },
   tabActive: { backgroundColor: COLORS.primary },
   tabText: { fontSize: 13, fontWeight: '600', color: COLORS.textLight },
   tabTextActive: { color: COLORS.white },

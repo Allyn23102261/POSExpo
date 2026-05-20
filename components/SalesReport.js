@@ -170,7 +170,8 @@ const styles = StyleSheet.create({
   subTitle: { fontSize: 14, fontWeight: '700', color: COLORS.text, marginBottom: 10 },
   rowItem: {
     flexDirection: 'row', alignItems: 'center',
-    paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: COLORS.border,
+    paddingVertical: 10, paddingHorizontal: 12,
+    borderBottomWidth: 1, borderBottomColor: COLORS.border,
     gap: 8,
   },
   rowItemLabel: { fontSize: 13, color: COLORS.text, fontWeight: '500' },
