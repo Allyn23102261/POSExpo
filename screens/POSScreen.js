@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, ScrollView, StyleSheet, Alert, SafeAreaView, StatusBar, TouchableOpacity, Text } from 'react-native';
+import {
+  View, ScrollView, StyleSheet, Alert, SafeAreaView,
+  StatusBar, TouchableOpacity, Text,
+} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Header from '../components/Header';
 import MenuGrid from '../components/MenuGrid';
@@ -7,14 +10,16 @@ import SizeModal from '../components/SizeModal';
 import CartSummary from '../components/CartSummary';
 import ReceiptModal from '../components/ReceiptModal';
 import PaymentModal from '../components/PaymentModal';
-import OrderHistoryItem from '../components/OrderHistoryItem';
+import OrderHistory from '../components/OrderHistory';
+import AdminPanel from '../components/AdminPanel';
+import SalesReport from '../components/SalesReport';
+import InventoryPanel from '../components/InventoryPanel';
 import { COLORS } from '../constants';
 import { generateOrderId, getTimestamp, calcSubtotal } from '../utils/helpers';
-import { fetchMenu, saveOrder, fetchOrders } from '../utils/api';
+import { fetchMenu, saveOrder } from '../utils/api';
 
-export default function POSScreen() {
+export default function POSScreen({ user, onLogout }) {
   const [cart, setCart] = useState([]);
-  const [orderHistory, setOrderHistory] = useState([]);
   const [selectedPayment, setSelectedPayment] = useState('cash');
   const [activeTab, setActiveTab] = useState('cart');
   const [sizeModalVisible, setSizeModalVisible] = useState(false);
@@ -25,9 +30,23 @@ export default function POSScreen() {
   const [amountReceived, setAmountReceived] = useState(0);
   const [menuItems, setMenuItems] = useState([]);
 
+  const isAdmin = user?.role === 'admin';
+
+  // Tabs available per role
+  const cashierTabs = ['cart', 'history'];
+  const adminTabs   = ['cart', 'history', 'admin', 'reports', 'inventory'];
+  const tabs        = isAdmin ? adminTabs : cashierTabs;
+
+  const TAB_LABELS = {
+    cart:      '🛒 Cart',
+    history:   '📋 History',
+    admin:     '⚙️ Admin',
+    reports:   '📊 Reports',
+    inventory: '📦 Stock',
+  };
+
   useEffect(() => {
     loadMenu();
-    loadOrders();
   }, []);
 
   const loadMenu = async () => {
@@ -39,16 +58,12 @@ export default function POSScreen() {
     }
   };
 
-  const loadOrders = async () => {
-    try {
-      const data = await fetchOrders();
-      setOrderHistory(data);
-    } catch (err) {
-      console.log('Failed to load orders:', err);
-    }
-  };
-
   const handleSelectMenuItem = (item) => {
+    // Check stock before allowing selection
+    if (item.stock !== null && item.stock !== undefined && item.stock <= 0) {
+      Alert.alert('Out of Stock', `"${item.name}" is currently out of stock.`);
+      return;
+    }
     setSelectedMenuItem(item);
     setSizeModalVisible(true);
   };
@@ -60,10 +75,21 @@ export default function POSScreen() {
       if (existing) {
         return prev.map((c) =>
           c.name === item.name && c.size === sizeOption.size
-            ? { ...c, quantity: c.quantity + 1 } : c
+            ? { ...c, quantity: c.quantity + 1 }
+            : c
         );
       }
-      return [...prev, { id: Date.now(), name: item.name, size: sizeOption.size, price: sizeOption.price, quantity: 1 }];
+      return [
+        ...prev,
+        {
+          id: Date.now(),
+          name: item.name,
+          size: sizeOption.size,
+          price: sizeOption.price,
+          quantity: 1,
+          image_name: item.image_name,
+        },
+      ];
     });
   };
 
@@ -81,7 +107,10 @@ export default function POSScreen() {
   const handleClear = () => setCart([]);
 
   const handleCheckout = () => {
-    if (cart.length === 0) { Alert.alert('Empty Cart', 'Please add items before checking out.'); return; }
+    if (cart.length === 0) {
+      Alert.alert('Empty Cart', 'Please add items before checking out.');
+      return;
+    }
     setPaymentModalVisible(true);
   };
 
@@ -93,23 +122,29 @@ export default function POSScreen() {
   };
 
   const handleConfirmSale = async () => {
+    const subtotal = calcSubtotal(cart);
     const order = {
       id: generateOrderId(),
       items: [...cart],
-      total: calcSubtotal(cart),
+      total: subtotal,
       payment: selectedPayment,
       amountReceived: amountReceived,
-      change: amountReceived - calcSubtotal(cart),
+      change: amountReceived - subtotal,
       timestamp: receiptTimestamp,
     };
     try {
-      await saveOrder(order);
-      setOrderHistory((prev) => [order, ...prev].slice(0, 20));
+      const result = await saveOrder(order);
+      if (!result.success) {
+        Alert.alert('Error', result.message || 'Failed to save order.');
+        return;
+      }
       setCart([]);
       setReceiptVisible(false);
+      // Refresh menu to get updated stock counts
+      loadMenu();
       Alert.alert('✔ Sale Completed', 'Thank you!');
     } catch (err) {
-      Alert.alert('Error', 'Failed to save order.');
+      Alert.alert('Error', 'Failed to save order. Please try again.');
     }
   };
 
@@ -117,36 +152,86 @@ export default function POSScreen() {
     <LinearGradient colors={[COLORS.gradientStart, COLORS.gradientEnd]} style={styles.gradient}>
       <SafeAreaView style={styles.safeArea}>
         <StatusBar barStyle="dark-content" />
-        <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          <Header />
-          <MenuGrid menuItems={menuItems} onSelectItem={handleSelectMenuItem} />
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Header with user info and logout */}
+          <Header user={user} onLogout={onLogout} />
+
+          {/* Menu grid (only shown on cart tab) */}
+          {activeTab === 'cart' && (
+            <MenuGrid menuItems={menuItems} onSelectItem={handleSelectMenuItem} />
+          )}
+
+          {/* Tab Bar */}
           <View style={styles.tabsContainer}>
-            <View style={styles.tabBar}>
-              {['cart', 'history'].map((tab) => (
-                <TouchableOpacity key={tab} style={[styles.tab, activeTab === tab && styles.tabActive]} onPress={() => setActiveTab(tab)}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.tabBarScroll}
+              contentContainerStyle={styles.tabBar}
+            >
+              {tabs.map((tab) => (
+                <TouchableOpacity
+                  key={tab}
+                  style={[styles.tab, activeTab === tab && styles.tabActive]}
+                  onPress={() => setActiveTab(tab)}
+                >
                   <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-                    {tab === 'cart' ? '🛒 Cart' : '📋 History'}
+                    {TAB_LABELS[tab]}
                   </Text>
                 </TouchableOpacity>
               ))}
-            </View>
+            </ScrollView>
+
+            {/* Tab Content */}
             {activeTab === 'cart' && (
-              <CartSummary cart={cart} selectedPayment={selectedPayment} onSelectPayment={setSelectedPayment}
-                onIncrease={handleIncrease} onDecrease={handleDecrease} onRemove={handleRemove}
-                onClear={handleClear} onCheckout={handleCheckout} />
+              <CartSummary
+                cart={cart}
+                selectedPayment={selectedPayment}
+                onSelectPayment={setSelectedPayment}
+                onIncrease={handleIncrease}
+                onDecrease={handleDecrease}
+                onRemove={handleRemove}
+                onClear={handleClear}
+                onCheckout={handleCheckout}
+              />
             )}
+
             {activeTab === 'history' && (
-              <View style={styles.historyContainer}>
-                {orderHistory.length === 0
-                  ? <Text style={styles.emptyHistory}>No orders yet</Text>
-                  : orderHistory.map((order) => <OrderHistoryItem key={order.id} order={order} />)
-                }
+              <OrderHistory isAdmin={isAdmin} />
+            )}
+
+            {activeTab === 'admin' && isAdmin && (
+              <AdminPanel onMenuUpdated={loadMenu} />
+            )}
+
+            {activeTab === 'reports' && isAdmin && (
+              <SalesReport />
+            )}
+
+            {activeTab === 'inventory' && isAdmin && (
+              <InventoryPanel />
+            )}
+
+            {/* Blocked tab — non-admin trying to access admin tab */}
+            {(activeTab === 'admin' || activeTab === 'reports' || activeTab === 'inventory') && !isAdmin && (
+              <View style={styles.blockedContainer}>
+                <Text style={styles.blockedIcon}>🔒</Text>
+                <Text style={styles.blockedText}>Admin access only.</Text>
               </View>
             )}
           </View>
         </ScrollView>
 
-        <SizeModal visible={sizeModalVisible} item={selectedMenuItem} onSelect={handleSelectSize} onClose={() => setSizeModalVisible(false)} />
+        <SizeModal
+          visible={sizeModalVisible}
+          item={selectedMenuItem}
+          onSelect={handleSelectSize}
+          onClose={() => setSizeModalVisible(false)}
+        />
 
         <PaymentModal
           visible={paymentModalVisible}
@@ -176,11 +261,31 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   scrollContent: { padding: 16, paddingBottom: 40 },
   tabsContainer: { marginTop: 16 },
-  tabBar: { flexDirection: 'row', backgroundColor: COLORS.white, borderRadius: 12, padding: 4, marginBottom: 12, elevation: 3 },
-  tab: { flex: 1, paddingVertical: 10, borderRadius: 9, alignItems: 'center' },
+  tabBarScroll: { marginBottom: 12 },
+  tabBar: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    padding: 4,
+    gap: 4,
+    elevation: 3,
+  },
+  tab: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 9,
+    alignItems: 'center',
+  },
   tabActive: { backgroundColor: COLORS.primary },
-  tabText: { fontSize: 14, fontWeight: '600', color: COLORS.textLight },
+  tabText: { fontSize: 13, fontWeight: '600', color: COLORS.textLight },
   tabTextActive: { color: COLORS.white },
-  historyContainer: { backgroundColor: COLORS.white, borderRadius: 16, padding: 16, minHeight: 100, elevation: 4 },
-  emptyHistory: { color: COLORS.textMuted, textAlign: 'center', paddingVertical: 20, fontSize: 14 },
+  blockedContainer: {
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    padding: 40,
+    alignItems: 'center',
+    elevation: 4,
+  },
+  blockedIcon: { fontSize: 40, marginBottom: 12 },
+  blockedText: { fontSize: 16, color: COLORS.textMuted, fontWeight: '600' },
 });

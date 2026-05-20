@@ -6,8 +6,11 @@ import POSScreen from './screens/POSScreen';
 export default function App() {
   const [user, setUser] = useState(null);
 
+  // Called when user logs out — clears user state and returns to login
+  const handleLogout = () => setUser(null);
+
   const content = user
-    ? <POSScreen user={user} />
+    ? <POSScreen user={user} onLogout={handleLogout} />
     : <LoginScreen onLogin={setUser} />;
 
   if (Platform.OS === 'web') {
